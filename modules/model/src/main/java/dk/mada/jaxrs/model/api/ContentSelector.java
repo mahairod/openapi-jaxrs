@@ -84,6 +84,7 @@ public class ContentSelector {
      */
     public record ContentContext(
             String resourcePath,
+            OperationBase operation,
             StatusCode statuscode,
             boolean isRequired,
             Location location,

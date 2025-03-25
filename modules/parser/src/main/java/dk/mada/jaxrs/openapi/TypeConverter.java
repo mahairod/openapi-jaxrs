@@ -5,6 +5,7 @@ import dk.mada.jaxrs.model.Property;
 import dk.mada.jaxrs.model.SubtypeSelector;
 import dk.mada.jaxrs.model.Validation;
 import dk.mada.jaxrs.model.api.ContentSelector.ContentContext;
+import dk.mada.jaxrs.model.api.OperationBase;
 import dk.mada.jaxrs.model.api.StatusCode;
 import dk.mada.jaxrs.model.naming.Naming;
 import dk.mada.jaxrs.model.types.Primitive;
@@ -574,14 +575,30 @@ public final class TypeConverter {
 
         Schema<?> schema = ri.schema;
         String resourcePath = apiContext.resourcePath();
-        String pathSimplified = resourcePath.replaceAll("[/_{}]", "-");
-        String dtoRawName = apiContext.location().name().toLowerCase(Locale.ROOT) + "-" + pathSimplified;
-        String statusSuffix = "";
-        StatusCode statuscode = apiContext.statuscode();
-        if (statuscode != StatusCode.HTTP_DEFAULT && statuscode != StatusCode.HTTP_OK) {
-            statusSuffix = "_" + statuscode.code();
+        Optional<String> opId = Optional.ofNullable(apiContext.operation()).flatMap(OperationBase::operationId);
+        final String dtoRawNameWithoutLoc;
+        if (opId.isEmpty()) {
+            dtoRawNameWithoutLoc = resourcePath.replaceAll("[/_{}]", "-");
+        } else {
+            String opIdClean = opId.get();
+            String meth = apiContext.operation().httpMethod().name();
+            if (opIdClean.toUpperCase().startsWith( meth )) {
+                opIdClean = opIdClean.substring(meth.length());
+                if (opIdClean.startsWith("_"))
+                    opIdClean = opIdClean.substring(1);
+            }
+            dtoRawNameWithoutLoc = opIdClean.replace('_', '-');
         }
-        String syntheticDtoName = "_" + naming.convertTypeName(dtoRawName) + statusSuffix;
+        final String syntheticDtoName;
+        {
+            String statusSuffix = "";
+            StatusCode statuscode = apiContext.statuscode();
+            if (statuscode != StatusCode.HTTP_DEFAULT && statuscode != StatusCode.HTTP_OK) {
+                statusSuffix = "_" + statuscode.code();
+            }
+            String dtoRawName =  dtoRawNameWithoutLoc + "-" + apiContext.location().name().toLowerCase(Locale.ROOT);
+            syntheticDtoName = "_" + naming.convertTypeName(dtoRawName) + statusSuffix;
+        }
         logger.trace("Inline response object for path {}: {}", resourcePath, syntheticDtoName);
         Dto dto = createDto(syntheticDtoName, schema);
         return parserRefs.of(dto, ri.validation);

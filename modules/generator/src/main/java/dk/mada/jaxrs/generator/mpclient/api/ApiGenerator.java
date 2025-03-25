@@ -485,7 +485,7 @@ public class ApiGenerator {
 
         // Only define an explicit media-type for the response, iff it is
         // not same media-type already declared for the operation
-        ContentContext context = new ContentContext(op.path(), r.code(), true, Location.RESPONSE, false);
+        ContentContext context = new ContentContext(op.path(), op, r.code(), true, Location.RESPONSE, false);
         Optional<String> mediaType = model.contentSelector()
                 .selectPreferredMediaType(responseMediaTypes, context)
                 .map(mt -> MediaTypes.toMediaType(imports, mt))
@@ -510,7 +510,7 @@ public class ApiGenerator {
                         rb.content().mediaTypes().stream().sorted().distinct().toList())
                 .orElse(List.of());
 
-        ContentContext context = new ContentContext(op.path(), StatusCode.HTTP_DEFAULT, false, Location.REQUEST, false);
+        ContentContext context = new ContentContext(op.path(), op, StatusCode.HTTP_DEFAULT, false, Location.REQUEST, false);
         return model.contentSelector()
                 .selectPreferredMediaType(mediaTypes, context)
                 .map(mt -> MediaTypes.toMediaType(imports, mt));
@@ -543,7 +543,7 @@ public class ApiGenerator {
 
         StatusCode code = mainResponse.map(Response::code).orElse(StatusCode.HTTP_DEFAULT);
 
-        ContentContext context = new ContentContext(op.path(), code, true, Location.RESPONSE, false);
+        ContentContext context = new ContentContext(op.path(), op, code, true, Location.RESPONSE, false);
         return model.contentSelector()
                 .selectPreferredMediaType(potentialMediaTypes, context)
                 .map(mt -> MediaTypes.toMediaType(imports, mt));

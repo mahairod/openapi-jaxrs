@@ -8,7 +8,7 @@ import org.immutables.value.Value.Immutable;
  * Information about a single operation.
  */
 @Immutable
-public interface Operation {
+public interface Operation extends OperationBase {
     /** {@return a builder for this type} */
     static ImmutableOperation.Builder builder() {
         return ImmutableOperation.builder();

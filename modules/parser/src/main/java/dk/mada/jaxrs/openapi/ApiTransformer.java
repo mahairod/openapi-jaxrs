@@ -7,6 +7,7 @@ import dk.mada.jaxrs.model.api.Content;
 import dk.mada.jaxrs.model.api.ContentSelector;
 import dk.mada.jaxrs.model.api.ContentSelector.ContentContext;
 import dk.mada.jaxrs.model.api.ContentSelector.Location;
+import dk.mada.jaxrs.model.api.OperationBase;
 import dk.mada.jaxrs.model.api.Operation;
 import dk.mada.jaxrs.model.api.Operations;
 import dk.mada.jaxrs.model.api.Parameter;
@@ -152,9 +153,9 @@ public class ApiTransformer {
         // Not including group yet, need behavior from Operation::group
         String groupOperationId = operationId.orElse(syntheticOperationId);
 
-        List<Parameter> parameters = new ArrayList<>(getParameters(resourcePath, op));
+        List<Parameter> parameters = new ArrayList<>(getParameters(resourcePath, op, httpMethod));
 
-        Optional<RequestBody> requestBody = getRequestBody(groupOperationId, resourcePath, op);
+        Optional<RequestBody> requestBody = getRequestBody(groupOperationId, resourcePath, op, httpMethod);
         requestBody.ifPresent(rb -> parameters.addAll(rb.formParameters()));
 
         List<Response> opResponses;
@@ -163,7 +164,7 @@ public class ApiTransformer {
                     .map(e -> {
                         String code = e.getKey();
                         ApiResponse resp = e.getValue();
-                        return toResponse(resourcePath, code, resp);
+                        return toResponse(resourcePath, new OperationDesc(op, httpMethod), code, resp);
                     })
                     .toList();
         } else {
@@ -194,7 +195,31 @@ public class ApiTransformer {
         return naming.convertOperationName(syntheticOpId);
     }
 
-    private Response toResponse(String resourcePath, String code, ApiResponse resp) {
+    static class OperationDesc implements OperationBase {
+        private final io.swagger.v3.oas.models.Operation op;
+        private final dk.mada.jaxrs.model.api.HttpMethod httpMethod;
+
+		private OperationDesc(io.swagger.v3.oas.models.Operation op, HttpMethod httpMethod) {
+			this.op = op;
+			this.httpMethod = toModelHttpMethod(httpMethod);
+		}
+
+		@Override
+        public Optional<String> operationId() {
+            return Optional.of(op.getOperationId());
+        }
+
+        @Override
+        public List<String> tags() {
+            return op.getTags();
+        }
+        @Override
+        public dk.mada.jaxrs.model.api.HttpMethod httpMethod() {
+            return httpMethod;
+        }
+    }
+
+    private Response toResponse(String resourcePath, OperationDesc op, String code, ApiResponse resp) {
         StatusCode status = StatusCode.of(code);
 
         String responseRef = resp.get$ref();
@@ -204,7 +229,7 @@ public class ApiTransformer {
             resp = responses.get(responseName);
         }
 
-        ContentContext cc = new ContentContext(resourcePath, status, false, Location.RESPONSE, false);
+        ContentContext cc = new ContentContext(resourcePath, op, status, false, Location.RESPONSE, false);
         Optional<String> description = Optional.ofNullable(resp).map(ApiResponse::getDescription);
         io.swagger.v3.oas.models.media.Content content = resp != null ? resp.getContent() : null;
 
@@ -216,7 +241,7 @@ public class ApiTransformer {
     }
 
     private Optional<RequestBody> getRequestBody(
-            String groupOpId, String resourcePath, io.swagger.v3.oas.models.Operation op) {
+        String groupOpId, String resourcePath, io.swagger.v3.oas.models.Operation op, HttpMethod httpMethod) {
         io.swagger.v3.oas.models.parameters.RequestBody body = op.getRequestBody();
         if (body == null) {
             return Optional.empty();
@@ -247,6 +272,7 @@ public class ApiTransformer {
 
         ContentContext cc = new ContentContext(
                 resourcePath,
+                new OperationDesc(op, httpMethod),
                 StatusCode.HTTP_DEFAULT,
                 toBool(body.getRequired()),
                 Location.REQUEST,
@@ -350,16 +376,16 @@ public class ApiTransformer {
         return isOpSecurityEnabled || (apiHasSecurity && !isOpSecurityDisabled);
     }
 
-    private List<Parameter> getParameters(String resourcePath, io.swagger.v3.oas.models.Operation op) {
+    private List<Parameter> getParameters(String resourcePath, io.swagger.v3.oas.models.Operation op, HttpMethod httpMethod) {
         List<io.swagger.v3.oas.models.parameters.Parameter> params = op.getParameters();
         if (params == null) {
             return List.of();
         }
 
-        return params.stream().map(param -> toParam(resourcePath, param)).toList();
+        return params.stream().map(param -> toParam(resourcePath, param, op, httpMethod)).toList();
     }
 
-    private Parameter toParam(String resourcePath, io.swagger.v3.oas.models.parameters.Parameter param) {
+    private Parameter toParam(String resourcePath, io.swagger.v3.oas.models.parameters.Parameter param, io.swagger.v3.oas.models.Operation op, HttpMethod httpMethod) {
         String name = param.getName();
         String paramIn = param.getIn();
 
@@ -370,7 +396,7 @@ public class ApiTransformer {
         boolean isParamRequired = toBool(param.getRequired());
 
         ContentContext cc =
-                new ContentContext(resourcePath, StatusCode.HTTP_DEFAULT, isParamRequired, Location.REQUEST, false);
+                new ContentContext(resourcePath, new OperationDesc(op, httpMethod), StatusCode.HTTP_DEFAULT, isParamRequired, Location.REQUEST, false);
 
         Schema<?> schema = param.getSchema();
         if (schema == null) {
@@ -402,7 +428,7 @@ public class ApiTransformer {
         return Boolean.TRUE.equals(b);
     }
 
-    private dk.mada.jaxrs.model.api.HttpMethod toModelHttpMethod(HttpMethod m) {
+    private static dk.mada.jaxrs.model.api.HttpMethod toModelHttpMethod(HttpMethod m) {
         return dk.mada.jaxrs.model.api.HttpMethod.valueOf(m.name());
     }
 
