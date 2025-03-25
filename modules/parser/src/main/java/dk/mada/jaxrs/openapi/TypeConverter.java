@@ -353,19 +353,20 @@ public final class TypeConverter {
             List<String> anyOfNames = anyOfRefs.stream()
                     .map(ParserTypeRef::typeName)
                     .map(TypeName::name)
+                    .map(naming::convertTypeName)
                     .sorted()
                     .toList();
 
             String interfaceName = sp.name();
             if (interfaceName == null) {
-                interfaceName = String.join("", anyOfNames);
+                interfaceName = String.join("Ⱶ", anyOfNames);
             }
 
             TypeName tn = typeNames.of(interfaceName);
 
             logger.trace(" - createAnyofRef interface {} : {}", tn, anyOfRefs);
 
-            TypeInterface ti = parserTypes.getOrMakeInterface(tn, anyOfRefs);
+            TypeInterface ti = parserTypes.getOrMakeInterface(tn, anyOfRefs, naming);
             return parserRefs.of(ti, ri.validation);
         }
         return null;

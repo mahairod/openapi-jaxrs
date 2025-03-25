@@ -111,11 +111,15 @@ public class ParserTypes {
      *
      * @param tn        the type name of the interface
      * @param anyOfRefs the types referenced by the interface
+     * @param naming    naming scheme for interface name generation
      * @return an existing or new interface type
      */
-    public TypeInterface getOrMakeInterface(TypeName tn, List<ParserTypeRef> anyOfRefs) {
+    public TypeInterface getOrMakeInterface(TypeName tn, List<ParserTypeRef> anyOfRefs, Naming naming) {
         Set<TypeName> usedTypeNames =
-                anyOfRefs.stream().map(ParserTypeRef::typeName).collect(toSet());
+                anyOfRefs.stream()
+                    .map(ParserTypeRef::typeName)
+                    .map( itn -> new TypeName(naming.convertTypeName(itn.name())))
+                    .collect(toSet());
         return interfaces.computeIfAbsent(tn, k -> TypeInterface.of(dtoPackageName, tn, usedTypeNames));
     }
 
